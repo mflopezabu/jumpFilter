@@ -2,9 +2,12 @@ from filter import Filter
 import numpy as np
 import matplotlib.pyplot as plt
 
-obs = np.concatenate([np.random.normal(0.5, 1, 1000), np.random.normal(-2.0, 3.0, 1000)])
+nobs = int(1e5)
+obs = np.concatenate([np.random.normal(0.5, 1, nobs),
+                      np.random.normal(0.5 + -2.0, np.sqrt(1.0 ** 2 + 3.0 ** 2), nobs)])
 F = Filter(obs=obs)
-F.calibrate(disp=True)
+res = F.calibrate(disp=True)
+V = F.estimateVariance()
 
 # ps = F.inferJumps()
 # plt.stem(np.round(ps, 0))

@@ -4,6 +4,8 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy.stats import norm
 
+from numdiff import D1f, D2f
+
 VERY_SMALL_POSITIVE = 1E-300
 SMALL_POSITIVE = 1E-9
 LARGE_POSITIVE = 1E100
@@ -39,16 +41,14 @@ class Filter:
                        options=kwargs)
 
         self._theta = res.x
+        return res
 
     def _computeLogLikelihood(self, theta=None):
         if theta is None:   theta = self._theta
 
         mu, sigma, lmbda, muJ, sigmaJ = theta
-        ls = []
-        for r in self._obs:
-            l = (1 - lmbda) * norm.pdf(r, loc=mu, scale=sigma) \
-                + lmbda * norm.pdf(r, loc=mu + muJ, scale=np.sqrt(sigma ** 2 + sigmaJ ** 2))
-            ls.append(l)
+        ls = (1 - lmbda) * norm.pdf(self._obs, loc=mu, scale=sigma) \
+             + lmbda * norm.pdf(self._obs, loc=mu + muJ, scale=np.sqrt(sigma ** 2 + sigmaJ ** 2))
         ls = np.log(np.maximum(ls, VERY_SMALL_POSITIVE))
         return ls
 
@@ -68,22 +68,43 @@ class Filter:
             ps.append(p)
         return ps
 
-    def _computeOPG(self, theta=None):
+    def estimateVariance(self, theta=None):
         if theta is None:   theta = self._theta
-        gs = []
-        for i, elt in enumerate(theta):
-            bump = np.abs(elt) / 100
-            theta1 = theta.copy()
-            theta1[i] = elt + bump
-
-            theta2 = theta.copy()
-            theta2[i] = elt - bump
-
-            g = 1 / (2 * bump) * (self._computeLogLikelihood(theta=theta1)
-                                  - self._computeLogLikelihood(theta=theta2))
-            gs.append(g)
-
-        gs = np.array(gs.T)
-        I = 1 / gs.shape[0] * sum(np.apply_along_axis(lambda x: np.outer(x, x), 1, gs))
-        V = np.linalg.inv(I)
+        V1 = self._estimateVarianceOPG(theta)
+        V2 = self._estimateVarianceHessian(theta)
+        V = V2.dot(np.linalg.solve(V1, V2))
         return V
+
+    def _estimateVarianceOPG(self, theta=None):
+        if theta is None:   theta = self._theta
+        G = D1f(self._computeLogLikelihood, theta)
+        V = np.linalg.inv(G.dot(G.T))
+        return V
+
+    def _estimateVarianceHessian(self, theta=None):
+        if theta is None:   theta = self._theta
+        H = D2f(self._computeCalibrationLogLikelihood, theta)
+        V = np.linalg.inv(H)
+        return V
+
+    # def _computeHessian(self, theta=None):
+    #     if theta is None:   theta = self._theta
+    #     H = np.array(len(theta))
+    #     for i, elt1 in enumerate(theta):
+    #         bump1 = np.abs(elt1) / 100
+    #         theta1 = theta.copy()
+    #         theta1[i] = elt1 + bump
+    #         for j, elt2 in enumerate(theta):
+    #             bump2 = np.abs(elt2) / 100
+    #
+    #             theta2 = theta.copy()
+    #             theta2[i] = elt2 - bump
+    #
+    #             g = 1 / (bump ** 2) * (self._computeLogLikelihood(theta=theta1)
+    #                                    + self._computeLogLikelihood(theta=theta2)
+    #                                    - 2 * self._computeLogLikelihood(theta=theta))
+    #
+    #
+    #     gs = np.array(gs)
+    #     V = np.linalg.inv(gs.dot(gs.T))
+    #     return V
