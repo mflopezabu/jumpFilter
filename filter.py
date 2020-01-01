@@ -4,7 +4,8 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy.stats import norm
 
-from numdiff import D1f, D2f
+from accelerators import computeLLF, computeLLV
+from numdiff import D1, D2
 
 VERY_SMALL_POSITIVE = 1E-300
 SMALL_POSITIVE = 1E-9
@@ -46,16 +47,18 @@ class Filter:
     def _computeLogLikelihood(self, theta=None):
         if theta is None:   theta = self._theta
 
-        mu, sigma, lmbda, muJ, sigmaJ = theta
-        ls = (1 - lmbda) * norm.pdf(self._obs, loc=mu, scale=sigma) \
-             + lmbda * norm.pdf(self._obs, loc=mu + muJ, scale=np.sqrt(sigma ** 2 + sigmaJ ** 2))
-        ls = np.log(np.maximum(ls, VERY_SMALL_POSITIVE))
-        return ls
+        # mu, sigma, lmbda, muJ, sigmaJ = theta
+        # ls = (1 - lmbda) * norm.pdf(self._obs, loc=mu, scale=sigma) \
+        #      + lmbda * norm.pdf(self._obs, loc=mu + muJ, scale=np.sqrt(sigma ** 2 + sigmaJ ** 2))
+        # ls = np.log(np.maximum(ls, VERY_SMALL_POSITIVE))
+        # return ls
+        return computeLLV(self._obs, theta)
 
     def _computeCalibrationLogLikelihood(self, theta=None):
         if theta is None:   theta = self._theta
-        L = sum(self._computeLogLikelihood(theta=theta))
-        return np.min([-L, LARGE_POSITIVE])
+        # L = np.sum(self._computeLogLikelihood(theta=theta))
+        # return np.min([-L, LARGE_POSITIVE])
+        return -computeLLF(self._obs, theta)
 
     def inferJumps(self, theta=None):
         if theta is None:   theta = self._theta
@@ -77,12 +80,12 @@ class Filter:
 
     def _estimateVarianceOPG(self, theta=None):
         if theta is None:   theta = self._theta
-        G = D1f(self._computeLogLikelihood, theta)
+        G = D1(self._computeLogLikelihood, theta)
         V = np.linalg.inv(G.dot(G.T))
         return V
 
     def _estimateVarianceHessian(self, theta=None):
         if theta is None:   theta = self._theta
-        H = D2f(self._computeCalibrationLogLikelihood, theta)
+        H = D2(self._computeCalibrationLogLikelihood, theta)
         V = np.linalg.inv(H)
         return V

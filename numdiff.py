@@ -7,7 +7,7 @@ def vecCanonical(n, i):
     return e
 
 
-def D1f(f, x, absStep=1e-2, relStep=1e-2):
+def D1(f, x, absStep=1e-2, relStep=1e-2):
     L = []
     dx = np.minimum(absStep, np.abs(x) * relStep)
     for i, dxi in enumerate(dx):
@@ -20,7 +20,7 @@ def D1f(f, x, absStep=1e-2, relStep=1e-2):
     return L
 
 
-def D2f(f, x, absStep=1e-2, relStep=1e-2):
+def D2(f, x, absStep=1e-2, relStep=1e-2):
     L = []
     dx = np.minimum(np.abs(x) * relStep, absStep)
     for i, dxi in enumerate(dx):
