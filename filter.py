@@ -4,7 +4,7 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy.stats import norm
 
-from accelerators import computeLLF, computeLLV
+from likelihood import computeLLF, computeLLV, computeLLVM
 from numdiff import D1, D2
 
 VERY_SMALL_POSITIVE = 1E-300
@@ -15,60 +15,46 @@ LARGE_POSITIVE = 1E100
 class Filter:
     def __init__(self, obs: Iterable[float]):
         self._obs = obs
-        self._theta = [np.mean(obs),
+        self._theta = [0,
                        np.std(obs),
                        0.5,
-                       -np.mean(obs),
+                       np.mean(obs),
                        2 * np.std(obs)]
 
     def params(self):
-        return {'mu': self._theta[0],
-                'sigma': self._theta[1],
-                'lambda': self._theta[2],
-                'muJ': self._theta[3],
-                'sigmaJ': self._theta[4]}
+        V = self.estimateVariance()
+        stdev = np.sqrt(np.diag(V))
+        labels = ['mu', 'sigma', 'lambda', 'muJ', 'sigmaJ']
+        return dict(zip(labels, zip(self._theta, stdev)))
 
-    def calibrate(self, theta0=None, **kwargs):
+    def calibrate(self, theta0=None, bnds=None, **kwargs):
         if theta0 is None:  theta0 = self._theta
-
-        bnds = [(-10, 10),
-                (SMALL_POSITIVE, 10),
-                (0, 1),
-                (-10, 10),
-                (SMALL_POSITIVE, 10)]
-        res = minimize(self._computeCalibrationLogLikelihood,
+        if bnds is None:    bnds = [(-10, 10),
+                                    (SMALL_POSITIVE, 10),
+                                    (0, 1),
+                                    (-10, 10),
+                                    (SMALL_POSITIVE, 10)]
+        res = minimize(lambda x: -self._computeLogLikelihoodFunction(x),
                        theta0,
                        bounds=bnds,
                        options=kwargs)
 
         self._theta = res.x
-        return res
 
-    def _computeLogLikelihood(self, theta=None):
+    def _computeLogLikelihoodVector(self, theta=None):
         if theta is None:   theta = self._theta
-
-        # mu, sigma, lmbda, muJ, sigmaJ = theta
-        # ls = (1 - lmbda) * norm.pdf(self._obs, loc=mu, scale=sigma) \
-        #      + lmbda * norm.pdf(self._obs, loc=mu + muJ, scale=np.sqrt(sigma ** 2 + sigmaJ ** 2))
-        # ls = np.log(np.maximum(ls, VERY_SMALL_POSITIVE))
-        # return ls
         return computeLLV(self._obs, theta)
 
-    def _computeCalibrationLogLikelihood(self, theta=None):
+    def _computeLogLikelihoodFunction(self, theta=None):
         if theta is None:   theta = self._theta
-        # L = np.sum(self._computeLogLikelihood(theta=theta))
-        # return np.min([-L, LARGE_POSITIVE])
-        return -computeLLF(self._obs, theta)
+        return computeLLF(self._obs, theta)
 
-    def inferJumps(self, theta=None):
+    def estimateJumps(self, theta=None):
         if theta is None:   theta = self._theta
 
-        mu, sigma, lmbda, muJ, sigmaJ = theta
-        ps = []
-        for r in self._obs:
-            p = lmbda * norm.pdf(r, loc=mu + muJ, scale=np.sqrt(sigma ** 2 + sigmaJ ** 2))
-            p /= (p + (1 - lmbda) * norm.pdf(r, loc=mu, scale=sigma))
-            ps.append(p)
+        lamb = theta[2]
+        l0, l1 = computeLLVM(self._obs, theta)
+        ps = lamb * l1 / ((1 - lamb) * l0 + lamb * l1)
         return ps
 
     def estimateVariance(self, theta=None):
@@ -80,12 +66,12 @@ class Filter:
 
     def _estimateVarianceOPG(self, theta=None):
         if theta is None:   theta = self._theta
-        G = D1(self._computeLogLikelihood, theta)
+        G = D1(self._computeLogLikelihoodVector, theta)
         V = np.linalg.inv(G.dot(G.T))
         return V
 
     def _estimateVarianceHessian(self, theta=None):
         if theta is None:   theta = self._theta
-        H = D2(self._computeCalibrationLogLikelihood, theta)
-        V = np.linalg.inv(H)
+        H = D2(self._computeLogLikelihoodFunction, theta)
+        V = np.linalg.inv(-H)
         return V

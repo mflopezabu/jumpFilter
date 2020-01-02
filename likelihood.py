@@ -12,10 +12,18 @@ def normpdf(x, mu, sigma):
 
 
 @jit(nopython=True)
+def computeLLVM(rs, theta):
+    mu, sigma, _, muJ, sigmaJ = theta
+    l0 = normpdf(rs, mu, sigma)
+    l1 = normpdf(rs, mu + muJ, np.sqrt(sigma ** 2 + sigmaJ ** 2))
+    return l0, l1
+
+
+@jit(nopython=True)
 def computeLLV(rs, theta):
-    mu, sigma, lamb, muJ, sigmaJ = theta
-    ls = (1 - lamb) * normpdf(rs, mu, sigma) + lamb * normpdf(rs, mu + muJ, np.sqrt(sigma ** 2 + sigmaJ ** 2))
-    return np.log(np.maximum(ls, VERY_SMALL_POSITIVE))
+    _, _, lamb, _, _ = theta
+    l0, l1 = computeLLVM(rs, theta)
+    return np.log(np.maximum((1 - lamb) * l0 + lamb * l1, VERY_SMALL_POSITIVE))
 
 
 @jit(nopython=True)
