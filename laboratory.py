@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 nobs = int(1e4)
-mu, sigma, lamb, muJ, sigmaJ = 0.25, 1.0, 0.5, -10.0, 3.0
+dt = 1 / 252
+mu, sigma, lamb, muJ, sigmaJ = 5.0 * dt, 20.0 * np.sqrt(dt), 0.05, -6.0, 3
 
 np.random.seed(42)
 u = np.random.normal(0, sigma, nobs)
@@ -29,13 +30,26 @@ confMatrix['Total'] = confMatrix.sum(axis=1)
 confMatrix.loc['Total'] = confMatrix.sum(axis=0)
 
 sns.set_style("ticks")
-_, axs = plt.subplots(figsize=(12, 8), ncols=2, sharex='all', sharey='all')
+_, ax = plt.subplots(figsize=(9, 4))
+ax.hist(r, density=True, bins=20, color='#46535E', alpha=0.75, edgecolor='k', linewidth=0.5)
+ax.grid()
+ax.set_xticklabels(["{:,.0f}%".format(x) for x in ax.get_xticks()])
+ax.set_yticklabels(["{:,.0f}%".format(100 * y) for y in ax.get_yticks()])
+ax.set_xlabel('Return')
+ax.set_ylabel('Relative Frequency')
+plt.savefig('./figs/hist.png', bbox_inches='tight', dpi=1200)
+
+sns.set_style("ticks")
+_, ax = plt.subplots(figsize=(9, 4))
 dictOptions = {'alpha': 1.0, 's': 1}
-axs[0].scatter(df['JumpProb'][~maskActual], df['Returns'][~maskActual], color='#003262', label='No Jump', **dictOptions)
-axs[0].set_title('No Jump')
-axs[1].scatter(df['JumpProb'][maskActual], df['Returns'][maskActual], color='#FDB515', label='Jump', **dictOptions)
-axs[1].set_title('Jump')
-for ax in axs:
-    ax.grid()
-    ax.axvspan(0.5, 1, color='#53626F', alpha=0.25, lw=0)
-    ax.set_xlim([-0.05, 1.05])
+ax.scatter(df['JumpProb'][~maskActual], df['Returns'][~maskActual], color='k', label='No Jump', **dictOptions)
+ax.scatter(df['JumpProb'][maskActual], df['Returns'][maskActual], color='r', label='Jump', **dictOptions)
+ax.set_xticklabels(["{:,.0f}%".format(100 * x) for x in ax.get_xticks()])
+ax.set_yticklabels(["{:,.0f}%".format(y) for y in ax.get_yticks()])
+ax.grid()
+ax.axvspan(0.5, 1, color='#46535E', alpha=0.25, lw=0)
+ax.set_xlim([-0.05, 1.05])
+ax.set_xlabel('Inferred Probability of Jump')
+ax.set_ylabel('Return')
+ax.legend()
+plt.savefig('./figs/inferredJumps.png', bbox_inches='tight', dpi=1200)

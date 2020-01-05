@@ -4,7 +4,7 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy.stats import norm
 
-from likelihood import computeLLF, computeLLV, computeLLVM
+from likelihood import computeLLF, computeLLV, computeLVM
 from numdiff import D1, D2
 
 VERY_SMALL_POSITIVE = 1E-300
@@ -49,11 +49,12 @@ class Filter:
         if theta is None:   theta = self._theta
         return computeLLF(self._obs, theta)
 
-    def estimateJumps(self, theta=None):
+    def estimateJumps(self, obs=None, theta=None):
+        if obs is None:   obs = self._obs
         if theta is None:   theta = self._theta
 
         lamb = theta[2]
-        l0, l1 = computeLLVM(self._obs, theta)
+        l0, l1 = computeLVM(obs, theta)
         ps = lamb * l1 / ((1 - lamb) * l0 + lamb * l1)
         return ps
 
